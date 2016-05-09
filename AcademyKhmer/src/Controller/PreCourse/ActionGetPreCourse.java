@@ -1,0 +1,30 @@
+package Controller.PreCourse;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import model.dao.PreCourseDAO;
+import model.dto.PreCourse;
+import Controller.Action;
+import Controller.ActionForward;
+
+public class ActionGetPreCourse implements Action{
+
+	public ActionGetPreCourse() {
+		// TODO Auto-generated constructor stub
+	}
+
+	@Override
+	public ActionForward execute(HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+		ActionForward forward = new ActionForward();
+		int id = Integer.parseInt(request.getParameter("id").trim());
+		PreCourse preCourse = new PreCourseDAO().getPreCourse(id);
+		response.setContentType("text/html;charset=UTF-8");
+		request.setCharacterEncoding("UTF-8");
+		request.setAttribute("preCourse", preCourse);
+		forward.setPath("viewprecourse.jsp");
+		forward.setRedirect(false);
+		return forward;
+	}
+}

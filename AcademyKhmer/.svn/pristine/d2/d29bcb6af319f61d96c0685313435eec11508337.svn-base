@@ -1,0 +1,163 @@
+package model.dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+import javax.naming.NamingException;
+
+import model.dto.Comment;
+
+public class CommentDAO {
+	Connection con;
+	public CommentDAO() throws ClassNotFoundException, NamingException, SQLException{
+		con = new DBUtility().getConnect();
+	}
+	
+	public ResultSet list(String keyword) throws SQLException{
+		try {
+			ResultSet rs = null;			
+			String sql = "SELECT CM.*, V.videoname, U.username FROM TBLCOMMENT CM INNER JOIN TBLVIDEO V ON CM.videoid=V.videoid INNER JOIN TBLUSER U ON CM.userid=U.userid WHERE CM.commenttext LIKE ?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, "%"+keyword+"%");
+			rs = ps.executeQuery(sql);
+			return rs;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	public ResultSet list() throws SQLException{
+		return list("");
+	}
+	
+	public boolean insert(Comment dto) throws SQLException{
+		try {
+			String sql = "INSERT INTO TBLCOMMENT VALUES(nextval('seq_comment'), NOW(), ?, ?, ?,?)";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, dto.getCommenttext());
+			ps.setInt(2, dto.getVideoid());
+			ps.setInt(3, dto.getUserid());
+			ps.setInt(4, dto.getRecommid());
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			con.close();
+		}
+		return false;
+	}
+	
+	public boolean reply(Comment dto) throws SQLException{
+		try{
+			String sql="Insert into tblComment values(nextval('seq_comment'), now(),? ,?,?,?)";
+			PreparedStatement ps= con.prepareStatement(sql);
+			ps.setString(1, dto.getCommenttext());
+			ps.setInt(2, dto.getVideoid());
+			ps.setInt(3, dto.getUserid());
+			ps.setInt(4, dto.getRecommid());
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+		}catch (SQLException e){
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	public boolean update(Comment dto) throws SQLException{
+		try {
+			String sql = "UPDATE TBLCOMMENT SET commentdate=?, commenttext=?, videoid=?, userid=? WHERE commentid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setDate(1, new java.sql.Date(dto.getCommentdate().getTime()));
+			ps.setString(2, dto.getCommenttext());
+			ps.setInt(3, dto.getUserid());
+			ps.setInt(4, dto.getVideoid());
+			ps.setInt(5, dto.getCommentid());
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			con.close();
+		}
+		return false;
+	}
+	
+	public boolean delete(int commentid) throws SQLException{
+		try {
+			String sql = "DELETE TBLCOMMENT WHERE commentid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setInt(1, commentid);
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	public int count() throws SQLException{
+		try {
+			String sql = "SELECT COUNT(commentid) FROM TBLCOMMENT";
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public Comment get(int commentid) throws SQLException{
+		try {
+			String sql = "SELECT CM.*, V.videoname, U.username FROM TBLCOMMENT CM INNER JOIN TBLVIDEO V ON CM.videoid=V.videoid INNER JOIN TBLUSER U ON CM.userid=U.userid WHERE CM.commentid="+commentid;
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				Comment dto = new Comment(commentid, rs.getDate("commentdate"), rs.getString("commenttext"), rs.getInt("videoid"), rs.getInt("userid"));
+				dto.setVideoname(rs.getString("videoid"));
+				dto.setUsername(rs.getString("username"));
+				return dto;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	public ResultSet listreplycomment(int videoid, int recomid) throws SQLException{
+		try{
+			ResultSet rs= null;
+			String sql="SELECT CM.*, V.videoname, U.username, U.userimageurl FROM TBLCOMMENT CM INNER JOIN TBLVIDEO V ON CM.videoid=V.videoid INNER JOIN TBLUSER U ON CM.userid=U.userid WHERE CM.videoid=? and CM.replycomid=? ORDER BY commentdate DESC";
+			PreparedStatement ps= con.prepareStatement(sql);
+			ps.setInt(1, videoid);
+			ps.setInt(2, recomid);
+			rs= ps.executeQuery();
+			return rs;
+		}catch(SQLException e){
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+}

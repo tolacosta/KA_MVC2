@@ -1,0 +1,705 @@
+package model.dao;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Properties;
+
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+import javax.naming.NamingException;
+
+import ultilities.ClsPagination;
+import model.dto.User;
+
+public class UserDAO {
+	Connection con;
+	public UserDAO() throws ClassNotFoundException, NamingException, SQLException{
+		con = new DBUtility().getConnect();
+	}
+
+	public ResultSet list(String keyword) throws SQLException{
+		try {
+			ResultSet rs = null;			
+			String sql = "SELECT U.*, UT.*, COUNT(DISTINCT V.VIDEOID) COUNTVIDEOS, COUNT(DISTINCT C.COMMENTID) COUNTCOMMENTS, COUNT(DISTINCT VP.*) COUNTVOTEPLUS, COUNT(DISTINCT VM.*) COUNTVOTEMINUS "
+					+ "FROM TBLUSER U INNER JOIN TBLUSERTYPE UT ON U.USERTYPEID=UT.USERTYPEID "
+					+ "LEFT JOIN TBLVIDEO V ON U.USERID=V.USERID "
+					+ "LEFT JOIN TBLCOMMENT C ON U.USERID=C.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=1) VP ON U.USERID=VP.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=-1) VM ON U.USERID=VM.USERID "
+					+ "WHERE U.USERNAME LIKE ? OR U.EMAIL LIKE ? "
+					+ "GROUP BY U.USERID, UT.USERTYPEID";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, "%"+keyword+"%");
+			ps.setString(2, "%"+keyword+"%");
+			rs = ps.executeQuery();
+			return rs;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	public ResultSet list() throws SQLException{
+		return list("");
+	}
+	public User Login(String name,String password) throws SQLException{
+		try {
+			System.out.println(name+" "+password);
+			ResultSet rs = null;
+			User dto = null;
+			String sql = "SELECT U.*, UT.*, COUNT(DISTINCT V.VIDEOID) COUNTVIDEOS, COUNT(DISTINCT C.COMMENTID) COUNTCOMMENTS, COUNT(DISTINCT VP.*) COUNTVOTEPLUS, COUNT(DISTINCT VM.*) COUNTVOTEMINUS "
+					+ "FROM TBLUSER U INNER JOIN TBLUSERTYPE UT ON U.USERTYPEID=UT.USERTYPEID "
+					+ "LEFT JOIN TBLVIDEO V ON U.USERID=V.USERID "
+					+ "LEFT JOIN TBLCOMMENT C ON U.USERID=C.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=1) VP ON U.USERID=VP.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=-1) VM ON U.USERID=VM.USERID "
+					+ "WHERE LOWER(U.EMAIL)=LOWER(?) AND U.PASSWORD=? "
+					+ "GROUP BY U.USERID, UT.USERTYPEID";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, name);
+			ps.setString(2, password);
+			
+			rs = ps.executeQuery();
+			while(rs.next()){
+				dto = new User(rs.getInt("userid"), rs.getString("email"), rs.getString("password"), rs.getString("username"), rs.getString("gender"), rs.getDate("dateofbirth"), rs.getString("phonenumber"), rs.getDate("registerdate"), rs.getString("userimageurl"), rs.getInt("usertypeid"));
+				dto.setUsertypename(rs.getString("usertypename"));
+				dto.setCountvideos(rs.getInt("countvideos"));
+				dto.setCountcomments(rs.getInt("countcomments"));
+				dto.setCountvoteplus(rs.getInt("countvoteplus"));
+				dto.setCountvoteminus(rs.getInt("countvoteminus"));
+				dto.setViewable(rs.getBoolean("viewable"));
+				dto.setCommentable(rs.getBoolean("commentable"));
+				dto.setPostable(rs.getBoolean("postable"));
+				dto.setDeleteable(rs.getBoolean("deleteable"));
+				dto.setUserable(rs.getBoolean("userable"));
+
+				//dto.setSchool(rs.getString("school"));
+
+//				dto.setSchool(rs.getString("school"));
+				
+
+				dto.setPoint(rs.getInt("point"));
+			}
+			return dto;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			//con.close();
+		}
+		return null;
+	
+	}
+	
+	public boolean checkEmail(String email) throws SQLException{
+		try{
+			ResultSet rs= null;
+			String sql= "select email, count(*) from tbluser where LOWER(email)=LOWER(?) GROUP BY email";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, email);
+			rs = ps.executeQuery();
+			while(rs.next()){
+				if(rs.getInt("count")>0){
+					return true;
+				}
+			}
+		}catch(SQLException e){
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	public boolean checkOldPassword(int userid, String pwd) throws SQLException{
+		try{
+			ResultSet rs= null;
+			String sql= "select password, count(*) from tbluser where userid=? and password=? GROUP BY password";
+			PreparedStatement ps = con.prepareStatement(sql);
+			System.out.println(userid + ""+ pwd);
+			ps.setInt(1, userid);
+			ps.setString(2, pwd);
+			rs = ps.executeQuery();
+			while(rs.next()){
+				if(rs.getInt("count")>0){
+					return true;
+				}
+			}
+		}catch(SQLException e){
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	public User get(int userid) throws SQLException{
+		try {
+			ResultSet rs = null;
+			User dto = null;
+			String sql = "SELECT U.*, UT.*, COUNT(DISTINCT V.VIDEOID) COUNTVIDEOS, COUNT(DISTINCT C.COMMENTID) COUNTCOMMENTS, COUNT(DISTINCT VP.*) COUNTVOTEPLUS, COUNT(DISTINCT VM.*) COUNTVOTEMINUS "
+					+ "FROM TBLUSER U INNER JOIN TBLUSERTYPE UT ON U.USERTYPEID=UT.USERTYPEID "
+					+ "LEFT JOIN TBLVIDEO V ON U.USERID=V.USERID "
+					+ "LEFT JOIN TBLCOMMENT C ON U.USERID=C.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=1) VP ON U.USERID=VP.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=-1) VM ON U.USERID=VM.USERID "
+					+ "WHERE U.USERID=? "
+					+ "GROUP BY U.USERID, UT.USERTYPEID";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setInt(1, userid);
+			rs = ps.executeQuery(sql);
+			while(rs.next()){
+				dto = new User(rs.getInt("userid"), rs.getString("email"), rs.getString("password"), rs.getString("username"), rs.getString("gender"), rs.getDate("dateofbirth"), rs.getString("phonenumber"), rs.getDate("registerdate"), rs.getString("userimageurl"), rs.getInt("usertypeid"));
+				dto.setUsertypename(rs.getString("usertypename"));
+				dto.setCountvideos(rs.getInt("countvideos"));
+				dto.setCountcomments(rs.getInt("countcomments"));
+				dto.setCountvoteplus(rs.getInt("countvoteplus"));
+				dto.setCountvoteminus(rs.getInt("countvoteminus"));
+				dto.setViewable(rs.getBoolean("viewable"));
+				dto.setCommentable(rs.getBoolean("commentable"));
+				dto.setPostable(rs.getBoolean("postable"));
+				dto.setDeleteable(rs.getBoolean("deleteable"));
+				dto.setUserable(rs.getBoolean("userable"));
+			}
+			return dto;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	public boolean insert(User dto) throws SQLException{
+		try {
+			String sql = "INSERT INTO TBLUSER VALUES(NEXTVAL('seq_user'), ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)";
+
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, dto.getEmail());
+			ps.setString(2, dto.getPassword());
+			ps.setString(3, dto.getUsername());
+			ps.setString(4, dto.getGender());
+			if(dto.getDateofbirth()!=null){
+				ps.setDate(5, new java.sql.Date(dto.getDateofbirth().getTime()));
+			}else{
+				ps.setDate(5, null);
+			}
+			ps.setString(6, dto.getPhonenumber());
+			ps.setString(7, dto.getUserimageurl());
+			ps.setInt(8, dto.getUsertypeid());
+
+			
+			ps.setInt(9, dto.getPoint());
+			ps.setInt(10, dto.getUniversityid());
+			ps.setInt(11, dto.getDepartmentid());
+
+			if(ps.executeUpdate()>0)
+				return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	
+	
+	
+	public boolean delete(int userid) throws SQLException{
+		try {
+			String sql = "DELETE FROM TBLUSER WHERE USERID="+userid;
+			Statement stmt = con.createStatement();
+			if(stmt.executeUpdate(sql)>0)
+				return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	public boolean update(User dto) throws SQLException{
+		try {
+
+			String sql = "UPDATE TBLUSER SET password=?, username=?, gender=?, dateofbirth=?, phonenumber=?, userimageurl=?,"
+					+ " usertypeid=?, universityid=?, departmentid=? WHERE userid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			if(dto.getPassword()!=null){
+			ps.setString(1, dto.getPassword());
+			}
+			if(dto.getUsername()!=null){
+			ps.setString(2, dto.getUsername());
+			}
+			if(dto.getGender()!=null){
+			ps.setString(3, dto.getGender());
+			}
+			if(dto.getDateofbirth()!=null){
+			ps.setDate(4, new java.sql.Date(dto.getDateofbirth().getTime()));
+			}
+			if(dto.getPhonenumber()!=null){
+			ps.setString(5, dto.getPhonenumber());
+			}
+			if(dto.getUserimageurl()!=null){
+			ps.setString(6, dto.getUserimageurl());
+			}
+			
+			ps.setInt(7, dto.getUsertypeid());
+
+			ps.setInt(10, dto.getUserid());
+
+			ps.setInt(8, dto.getUniversityid());
+			ps.setInt(9, dto.getDepartmentid());
+			ps.setInt(10, dto.getUserid());
+
+			if(ps.executeUpdate()>0)
+				return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	public boolean insertcover(String coverphoto, int userid) throws SQLException{
+		try{
+			String sql= "insert into tblCoverPhoto values (NEXTVAL('seq_cover'),?,? )";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, coverphoto);
+			ps.setInt(2, userid);
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+			
+		}catch(SQLException e){
+			e.printStackTrace();
+		}finally{
+			//con.close();
+		}
+		
+		return false;
+	}
+	
+	public String getCover(int userid) throws SQLException{
+		String coverpic = null;
+		try{
+			ResultSet rs= null;
+			String sql="SELECT coverphoto from tblcoverphoto where userid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setInt(1, userid);
+			
+			rs = ps.executeQuery();
+			while(rs.next()){
+				coverpic = rs.getString("coverphoto");
+			}
+			
+			return coverpic;
+		}catch(SQLException e){
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+		
+	}
+	public boolean updatecover(User dto) throws SQLException{
+		try{
+			String sql= "Update tblCoverPhoto set coverphoto=? where userid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			if(dto.getCoverphoto()!=null){
+				ps.setString(1, dto.getCoverphoto());
+			}
+			ps.setInt(2, dto.getUserid());
+			
+			if(ps.executeUpdate()>0)
+				return true;
+		}catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		
+		return false;
+	}
+	
+	
+	public int countusers(int usertypeid) throws SQLException{
+		try {
+			String sql = "SELECT COUNT(userid) FROM TBLUSER WHERE usertypeid="+usertypeid;
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public int getMaxCurrentUserid() throws SQLException{
+		ResultSet rs=null;
+		int r = 0;
+		try{
+		String sql="select LAST_VALUE from seq_user";
+		PreparedStatement ps=con.prepareStatement(sql);
+		rs=ps.executeQuery();
+		rs.next();
+		r=rs.getInt(1);
+		
+			}catch(Exception e){e.printStackTrace();}
+	return r+1;
+	}
+	
+	public int countusers() throws SQLException{
+		try {
+			String sql = "SELECT COUNT(userid) FROM TBLUSER";
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public int countvideos(int userid, String q) throws SQLException{
+		try {
+			ResultSet rs = null;
+			String sql = "SELECT COUNT(V.videoid) FROM TBLVIDEO V WHERE userid="+userid+" AND lower(V.Videoname) LIKE lower('%"+q+"%')";
+			Statement stmt = con.createStatement();
+			rs=stmt.executeQuery(sql);
+			if(rs.next())
+				return rs.getInt(1);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public int countvoteplus(int userid) throws SQLException{
+		try {
+			String sql = "SELECT COUNT(userid) FROM TBLVOTE WHERE votetype=1 AND userid="+userid;
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public int countvoteminus(int userid) throws SQLException{
+		try {
+			String sql = "SELECT COUNT(userid) FROM TBLVOTE WHERE votetype=-1 AND userid="+userid;
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public int countcomments(int userid) throws SQLException{
+		try {
+			String sql = "SELECT COUNT(userid) FROM TBLCOMMENT WHERE userid="+userid;
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public ResultSet listcomments(int userid) throws SQLException{
+		try {
+			ResultSet rs = null;			
+			String sql = "SELECT CM.*, V.videoname, U.username FROM TBLCOMMENT CM INNER JOIN TBLVIDEO V ON CM.videoid=V.videoid INNER JOIN TBLUSER U ON CM.userid=U.userid WHERE CM.userid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setInt(1, userid);
+			rs = ps.executeQuery();
+			return rs;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	
+	public ResultSet listplaylist(int userid) throws SQLException{
+		try {
+			ResultSet rs = null;
+			String sql = "SELECT P.*, U.username, COUNT(DISTINCT PD.videoid) countvideos FROM TBLPLAYLIST P INNER JOIN TBLUSER U ON P.userid=U.userid "
+					+ "LEFT JOIN TBLPLAYlISTDETAIL PD ON P.playlistid=PD.playlistid "
+					+ "WHERE P.userid=? GROUP BY P.playlistid, U.username";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setInt(1, userid);
+			rs=ps.executeQuery();
+			return rs;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	public int countplaylist(int userid) throws SQLException{
+		try {
+			String sql = "SELECT COUNT(playlistid) FROM TBLPLAYLIST WHERE userid="+userid;
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public boolean changePassword(int user_id, String oldPassword, String newPassword){
+		try{
+			String sql="UPDATE TBLUSER SET Password=? WHERE userid=? AND Password=?";
+			PreparedStatement ps=con.prepareStatement(sql);
+			ps.setString(1, newPassword);
+			ps.setInt(2, user_id);
+			ps.setString(3, oldPassword);
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+			return false;
+		}finally{
+			try {
+				con.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return false;
+	}
+	
+	
+	// Tola
+	public ResultSet addminListAllUser(String keyword ,  ClsPagination pagin) throws SQLException{
+		try {
+			ResultSet rs = null;			
+			String sql = "SELECT U.*, UT.*, COUNT(DISTINCT V.VIDEOID) COUNTVIDEOS, COUNT(DISTINCT C.COMMENTID) COUNTCOMMENTS, COUNT(DISTINCT VP.*) COUNTVOTEPLUS, COUNT(DISTINCT VM.*) COUNTVOTEMINUS , COUNT(DISTINCT PL.PLAYLISTID) COUNTPLAYLIST "
+					+ "FROM TBLUSER U INNER JOIN TBLUSERTYPE UT ON U.USERTYPEID=UT.USERTYPEID "
+					+ "LEFT JOIN TBLVIDEO V ON U.USERID=V.USERID "
+					+ "LEFT JOIN tblplaylist PL ON U.USERID=PL.userid " 
+					+ "LEFT JOIN TBLCOMMENT C ON U.USERID=C.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=1) VP ON U.USERID=VP.USERID "
+					+ "LEFT JOIN (SELECT * FROM TBLVOTE WHERE VOTETYPE=-1) VM ON U.USERID=VM.USERID "
+					+ "WHERE U.USERNAME LIKE ? "
+					+ "GROUP BY U.USERID, UT.USERTYPEID order by  U.USERID desc offset ? limit ?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, "%"+keyword+"%");
+			ps.setInt(2, pagin.offset());
+			ps.setInt(3, pagin.getPerPage());
+			rs = ps.executeQuery();
+			return rs;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+//			con.close();
+		}
+		return null;
+	}
+	
+	public int adminCountUsers(String search) throws SQLException{
+		try {
+			String sql = "SELECT COUNT(userid) FROM TBLUSER WHERE USERNAME LIKE ?";
+			PreparedStatement ps=con.prepareStatement(sql);
+			ps.setString(1, "%"+search+"%");
+			ResultSet rs = ps.executeQuery();
+			if(rs.next()){
+				return rs.getInt(1); 
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return 0;
+	}
+	
+	public boolean updateUserType(User dto) throws SQLException{
+		try {
+			String sql = "UPDATE TBLUSER SET  usertypeid=? WHERE userid=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setInt(1, dto.getUsertypeid());
+			ps.setInt(2, dto.getUserid());
+			if(ps.executeUpdate()>0)
+				return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	
+	
+	
+	public boolean sendBCC(String rec, String subject, String messageBody) {
+		
+		final String username = "info.kshrd@gmail.com";
+		final String password = "kshrd2014!@#";
+		
+		Properties props = new Properties();
+		props.put("mail.smtp.host", "smtp.gmail.com");
+		props.put("mail.smtp.socketFactory.port", "465");
+		props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+		props.put("mail.smtp.auth", "true");
+		props.put("mail.smtp.port", "465");
+ 
+		Session session = Session.getDefaultInstance(props,
+			new javax.mail.Authenticator() {
+				protected PasswordAuthentication getPasswordAuthentication() {
+					return new PasswordAuthentication(username, password);
+				}
+			});
+
+		try {
+ 
+			Message message = new MimeMessage(session);
+			message.setRecipients(Message.RecipientType.BCC,InternetAddress.parse(rec));
+			message.setSubject(subject);
+			message.setContent(messageBody, "text/html");
+ 
+			Transport.send(message);
+ 
+			return true;
+ 
+		} catch (MessagingException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+	
+	
+	public boolean checkEmailPWD(String email) throws SQLException{
+		try {
+			ResultSet rs = null;
+			String sql = "Select email from tbluser where email=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, email);
+			rs = ps.executeQuery();
+			if(rs.next()) return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return false;
+	}
+	
+	public String getUserPwdByEmail(String email ) throws SQLException, ClassNotFoundException, NamingException{
+		try {
+			con = new DBUtility().getConnect();
+			ResultSet rs = null;
+			String sql = "select password from tbluser where email=?";
+			PreparedStatement ps = con.prepareStatement(sql);
+			ps.setString(1, email);
+			rs = ps.executeQuery();
+			if(rs.next()) return email = rs.getString(1);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+	}
+	
+	public boolean ressetPassword(String email , String oldPassword, String newPassword){
+		try{
+			String sql="UPDATE TBLUSER SET Password=? WHERE email=? AND Password=?";
+			PreparedStatement ps=con.prepareStatement(sql);
+			ps.setString(1, newPassword);
+			ps.setString(2, email);
+			ps.setString(3, oldPassword);
+			if(ps.executeUpdate()>0){
+				return true;
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+			return false;
+		}finally{
+			try {
+				con.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return false;
+	}
+	
+	public static void main(String args[]) throws ClassNotFoundException, NamingException, SQLException{
+		if(new UserDAO().sendBCC("tolapheng99@gmail.com", "Test", "TestTaeeAoun")){
+			System.out.println("Yes");
+		}else
+			System.out.println("No");
+	
+	}
+	
+	
+	public ResultSet getLastestUsers() throws SQLException{
+		
+		try {
+			ResultSet rs = null;			
+			String sql = "SELECT userid, email, username, userimageurl from tbluser ORDER BY userid limit 5";
+			PreparedStatement ps = con.prepareStatement(sql);			
+			rs = ps.executeQuery();
+			return rs;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}finally{
+			con.close();
+		}
+		return null;
+		
+	}
+}

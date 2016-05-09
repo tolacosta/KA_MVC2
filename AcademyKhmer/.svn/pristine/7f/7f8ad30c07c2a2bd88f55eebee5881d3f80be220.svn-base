@@ -1,0 +1,53 @@
+package Controller.PreCourse;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import model.dao.PreCourseDAO;
+import model.dto.PreCourse;
+import Controller.Action;
+import Controller.ActionForward;
+
+public class ActionAddPreCourse implements Action{
+
+	public ActionAddPreCourse() {
+		// TODO Auto-generated constructor stub
+	}
+
+	@Override
+	public ActionForward execute(HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+		ActionForward forward = new ActionForward();
+		PreCourse preCourse = new PreCourse();
+		preCourse.setUsername(request.getParameter("username").trim());
+		preCourse.setEmail(request.getParameter("email").trim());
+		preCourse.setTelephone(request.getParameter("phonenumber").trim());
+		preCourse.setUniversity(request.getParameter("university").trim());
+		DateFormat format = new SimpleDateFormat("yyyy-mm-dd", Locale.ENGLISH);
+		Date date = format.parse(request.getParameter("dateofbirth").trim());
+		java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+		preCourse.setDob(sqlDate);
+		preCourse.setPob(request.getParameter("address").trim());
+		String java = request.getParameter("java").trim();
+		String web = request.getParameter("web").trim();
+		preCourse.setJavaCourse(java);
+		preCourse.setWebCourse(web);
+		preCourse.setPayment(0);
+		preCourse.setComment(request.getParameter("comment").trim());
+		preCourse.setGender(request.getParameter("gender"));
+		boolean status = new PreCourseDAO().addPreCourse(preCourse);
+		if(status){
+			forward.setPath("precourse.jsp");
+			forward.setRedirect(false);
+		}else{
+			System.out.println("Transaction fail!");
+		}
+		return forward;
+	}
+
+}
